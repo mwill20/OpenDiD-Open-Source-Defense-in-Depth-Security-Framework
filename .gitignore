@@ -1,0 +1,45 @@
+# Environment variables and secrets
+.env
+*.key
+*.pem
+*.crt
+
+# Configuration files with sensitive data
+configs/**/credentials.yml
+configs/**/secrets.yml
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+data/
+*.db
+*.sqlite
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker volumes
+volumes/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+dist/
+build/
+target/

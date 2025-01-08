@@ -1,0 +1,47 @@
+version: '3'
+services:
+  wazuh:
+    image: wazuh/wazuh:latest
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "55000:55000"
+    volumes:
+      - ./configs/wazuh:/var/ossec/etc
+    networks:
+      - security_net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.0
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    networks:
+      - security_net
+
+  thehive:
+    image: thehiveproject/thehive4:latest
+    depends_on:
+      - elasticsearch
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./configs/thehive:/etc/thehive
+    networks:
+      - security_net
+
+  splunk:
+    image: splunk/splunk:latest
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=changeme
+    ports:
+      - "8000:8000"
+      - "8088:8088"
+    networks:
+      - security_net
+
+networks:
+  security_net:
+    driver: bridge
