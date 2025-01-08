@@ -1,4 +1,17 @@
-# Enterprise Defense-in-Depth Security Infrastructure
+# OpenDiD: Open Source Defense-in-Depth Security Framework
+
+OpenDiD is a battle-tested Defense-in-Depth security framework developed in a live production environment by a team of 30+ security professionals. It integrates essential security tools including EDR, SIEM, IDS, deception technology, and incident response platforms, providing a comprehensive security posture for organizations.
+
+🛡️ Key Features:
+• Complete integration flows and documentation
+• Production-tested configurations
+• Real-world deployment guides
+• Automated incident response playbooks
+• Comprehensive security workflows
+
+⚠️ Note: This represents a real implementation that evolved through continuous learning and improvement. While not a finished product, it serves as a valuable reference for organizations building their security infrastructure.
+
+Built with open-source tools and nonprofit licensing, OpenDiD demonstrates what's possible in building a robust security framework through community collaboration.
 
 ## Important Context & Disclaimer
 
