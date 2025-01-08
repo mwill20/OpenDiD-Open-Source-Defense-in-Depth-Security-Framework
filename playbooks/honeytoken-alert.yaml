@@ -1,0 +1,189 @@
+name: HoneyToken Alert Response
+description: Automated response to triggered honeytokens
+version: 1.0
+author: Security Team
+severity: High
+
+triggers:
+  - type: CanaryToken
+    alert: token_triggered
+    categories:
+      - file_access
+      - credentials_use
+      - database_query
+  - type: Wazuh
+    rule_id: 87860
+    level: 13
+
+variables:
+  evidence_retention: 30d
+  alert_threshold: 1
+
+conditions:
+  - check: token_type
+    criteria:
+      - type: "file"
+        severity: high
+      - type: "credentials"
+        severity: critical
+      - type: "database"
+        severity: critical
+      
+  - check: source_location
+    criteria:
+      - internal: "high"
+      - external: "critical"
+
+actions:
+  # Immediate Response
+  - name: capture_evidence
+    tool: Canary
+    action: collect_data
+    parameters:
+      token_id: "{{token_id}}"
+      include:
+        - access_logs
+        - network_traffic
+        - source_details
+        - accessed_content
+
+  # Network Response
+  - name: network_containment
+    tool: NVIS
+    action: isolate_source
+    parameters:
+      ip_address: "{{source_ip}}"
+      direction: bidirectional
+      duration: 4h
+      reason: "HoneyToken Access"
+
+  # Source Investigation
+  - name: source_analysis
+    tool: RITA
+    action: analyze_traffic
+    parameters:
+      source_ip: "{{source_ip}}"
+      timeframe:
+        start: "{{event_time-3600}}"
+        end: "{{event_time+300}}"
+      analysis_types:
+        - connection_history
+        - dns_queries
+        - data_transfer
+
+  # Endpoint Response
+  - name: endpoint_investigation
+    tool: BitDefender
+    action: investigate_endpoint
+    parameters:
+      hostname: "{{source_hostname}}"
+      actions:
+        - process_tree
+        - network_connections
+        - file_access
+        - memory_analysis
+
+  # Access Control
+  - name: revoke_access
+    tool: PacketFence
+    action: quarantine_device
+    parameters:
+      mac_address: "{{source_mac}}"
+      reason: "HoneyToken Trigger"
+      duration: indefinite
+
+  # Incident Creation
+  - name: create_incident
+    tool: TheHive
+    action: create_case
+    parameters:
+      title: "HoneyToken Alert - {{token_type}}"
+      description: |
+        HoneyToken triggered:
+        - Token: {{token_name}} ({{token_type}})
+        - Source: {{source_ip}} ({{source_hostname}})
+        - User: {{username}}
+        - Location: {{access_location}}
+        - Token Content: {{token_content}}
+      severity: 3
+      tags:
+        - honeytoken
+        - "{{token_type}}"
+        - deception
+        - "{{attack_vector}}"
+      tlp: amber
+      pap: amber
+      tasks:
+        - "Validate Alert"
+        - "Analyze Access Pattern"
+        - "Investigate Source"
+        - "Check for Additional Access"
+        - "Review Security Controls"
+        - "Update Deception Strategy"
+
+  # Alert Notification
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-critical"
+      message: |
+        🍯 HoneyToken Alert: {{token_type}}
+        Token: {{token_name}}
+        Source: {{source_hostname}} ({{source_ip}})
+        User: {{username}}
+        Access Time: {{access_time}}
+        
+        Initial Analysis:
+        - Access Pattern: {{access_pattern}}
+        - Source Location: {{access_location}}
+        - Previous History: {{previous_alerts}}
+        
+        Actions Taken:
+        - Source isolated
+        - Evidence collected
+        - Case created: {{thehive_case_url}}
+      mentions: "@security-oncall"
+
+metrics:
+  - name: detection_effectiveness
+    description: Effectiveness of honeytoken placement
+    calculation: "true_positive / (true_positive + false_positive)"
+    threshold: 0.9
+
+  - name: response_time
+    description: Time from trigger to containment
+    calculation: "containment_time - detection_time"
+    threshold: 300
+
+recovery:
+  - name: validate_containment
+    tool: NVIS
+    action: verify_isolation
+    parameters:
+      ip_address: "{{source_ip}}"
+      check_duration: 15m
+
+  - name: restore_access
+    tool: PacketFence
+    action: restore_access
+    parameters:
+      mac_address: "{{source_mac}}"
+      require_approval: true
+      security_scan: required
+
+reporting:
+  - destination: Splunk
+    index: security_incidents
+    sourcetype: honeytoken_alert
+
+  - destination: TheHive
+    case_tasks:
+      - task: Token Analysis
+        status: InProgress
+        description: |
+          HoneyToken Details:
+          - Type: {{token_type}}
+          - Location: {{token_location}}
+          - Access Pattern: {{access_pattern}}
+          - Response Actions: {{response_summary}}

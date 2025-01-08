@@ -1,0 +1,190 @@
+%YAML 1.1
+---
+# Suricata IDS Configuration for Defense-in-Depth Security Stack
+
+vars:
+  address-groups:
+    HOME_NET: "[10.0.0.0/8,172.16.0.0/12,192.168.0.0/16]"
+    HONEYPOT_NET: "[10.0.2.0/24]"
+    EXTERNAL_NET: "!$HOME_NET"
+    DNS_SERVERS: "[8.8.8.8,8.8.4.4]"
+    SMTP_SERVERS: "[10.0.0.10,10.0.0.11]"
+
+  port-groups:
+    HONEYPOT_PORTS: "[21,22,23,80,443,445,3389]"
+    HTTP_PORTS: "[80,443]"
+    SHELLCODE_PORTS: "[!80,!443]"
+
+max-pending-packets: 2048
+
+default-rule-path: /etc/suricata/rules
+rule-files:
+  - suricata.rules
+  - honeypot.rules
+  - emerging-threats.rules
+  - local.rules
+
+af-packet:
+  - interface: eth0
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    buffer-size: 128mb
+    use-emergency-flush: yes
+    checksum-checks: kernel
+
+threading:
+  set-cpu-affinity: yes
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [ 0 ]
+    - receive-cpu-set:
+        cpu: [ 1 ]
+    - decode-cpu-set:
+        cpu: [ 2, 3 ]
+    - stream-cpu-set:
+        cpu: [ 4, 5 ]
+    - detect-cpu-set:
+        cpu: [ 6, 7 ]
+  detect-thread-ratio: 1.5
+
+detect-engine:
+  profile: medium
+  sgh-mpm-context: auto
+  inspection-recursion-limit: 3000
+  custom-values:
+    toclient-groups: 2
+    toserver-groups: 2
+  rule-reload: true
+  
+  # Hyperscan settings
+  hyperscan:
+    enabled: yes
+    scratch-size: 0
+    database-path: /var/lib/suricata/hyperscan
+
+app-layer:
+  protocols:
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+      ja3-fingerprints: yes
+      
+    ssh:
+      enabled: yes
+      detection-ports:
+        dp: 22
+        
+    http:
+      enabled: yes
+      libhtp:
+        default-config:
+          personality: IDS
+          request-body-limit: 100kb
+          response-body-limit: 100kb
+          
+    ftp:
+      enabled: yes
+      memcap: 64mb
+      
+    smb:
+      enabled: yes
+      detection-ports:
+        dp: 445
+        
+    rdp:
+      enabled: yes
+      detection-ports:
+        dp: 3389
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: /var/log/suricata/eve.json
+      types:
+        - alert
+        - http
+        - dns
+        - tls
+        - files
+        - ssh
+        - flow
+        - netflow
+        - rdp
+        - smb
+      community-id: yes
+      pcap-file: yes
+      community-id-seed: 0
+
+  - alert-json:
+      enabled: yes
+      filename: /var/log/suricata/alerts.json
+      append: yes
+      
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      interval: 30
+      append: yes
+
+  - pcap-log:
+      enabled: yes
+      filename: /var/log/suricata/pcap.log
+      limit: 100mb
+      max-files: 10
+      mode: sguil
+      use-stream-depth: yes
+
+logging:
+  default-log-level: info
+  outputs:
+    - console:
+        enabled: yes
+        filter:
+          - "!engine"
+    - file:
+        enabled: yes
+        filename: /var/log/suricata/suricata.log
+        level: info
+        append: yes
+
+wazuh-integration:
+  enabled: yes
+  socket: /var/ossec/queue/sockets/queue
+  level: 5
+
+host-os-policy:
+  windows: [10.0.0.0/24]
+  linux: [10.0.1.0/24]
+  bsd: [10.0.2.0/24]
+
+defrag:
+  max-frags: 65535
+  prealloc: yes
+  timeout: 60
+
+flow:
+  memcap: 128mb
+  hash-size: 65536
+  prealloc: 10000
+  emergency-recovery: 30
+
+stream:
+  memcap: 256mb
+  checksum-validation: yes
+  inline: no
+  bypass: yes
+  reassembly:
+    memcap: 256mb
+    depth: 1mb
+    toserver-chunk-size: 2560
+    toclient-chunk-size: 2560
+
+reputation:
+  categories-file: /etc/suricata/reputation.categories
+  files:
+    - /etc/suricata/reputation.list

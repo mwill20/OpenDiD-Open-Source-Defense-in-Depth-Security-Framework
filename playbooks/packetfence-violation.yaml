@@ -1,0 +1,200 @@
+name: PacketFence Security Violation Response
+description: Automated response to security violations detected by PacketFence
+version: 1.0
+author: Security Team
+severity: Medium
+
+triggers:
+  - type: PacketFence
+    alert: security_violation
+    categories:
+      - rogue_dhcp
+      - mac_spoofing
+      - nessus_scan
+      - openvas_scan
+      - connection_attempt
+      - failed_authentication
+  - type: Wazuh
+    rule_id: 87850
+    level: 8
+
+variables:
+  max_violations: 3
+  quarantine_duration: 4h
+  scan_timeout: 1800
+
+conditions:
+  - check: violation_count
+    criteria:
+      - count: ">= {{max_violations}}"
+      - timeframe: "24h"
+      
+  - check: device_status
+    criteria:
+      - registration: "verified"
+      - compliance: "check"
+
+actions:
+  # Initial Assessment
+  - name: check_device
+    tool: PacketFence
+    action: device_info
+    parameters:
+      mac_address: "{{device_mac}}"
+      include:
+        - registration_status
+        - previous_violations
+        - device_category
+        - username
+        - location
+
+  # Compliance Check
+  - name: verify_compliance
+    tool: PacketFence
+    action: compliance_check
+    parameters:
+      mac_address: "{{device_mac}}"
+      checks:
+        - antivirus_status
+        - firewall_status
+        - patch_level
+        - required_software
+
+  # Network Response
+  - name: quarantine_device
+    tool: PacketFence
+    action: enforcement
+    parameters:
+      mac_address: "{{device_mac}}"
+      action: "quarantine"
+      duration: "{{quarantine_duration}}"
+      vlan: 1200
+      reason: "Security violation: {{violation_type}}"
+
+  # Security Scan
+  - name: security_scan
+    tool: PacketFence
+    action: scan_device
+    parameters:
+      mac_address: "{{device_mac}}"
+      scan_type: "openvas"
+      timeout: "{{scan_timeout}}"
+      profile: "Full Scan"
+
+  # NVIS Integration
+  - name: update_trust_score
+    tool: NVIS
+    action: modify_score
+    parameters:
+      device_id: "{{device_mac}}"
+      score_adjustment: -20
+      reason: "PacketFence violation"
+
+  # EDR Check
+  - name: verify_edr
+    tool: BitDefender
+    action: check_status
+    parameters:
+      hostname: "{{device_hostname}}"
+      checks:
+        - agent_status
+        - protection_status
+        - last_scan
+        - threats_detected
+
+  # Incident Creation
+  - name: create_incident
+    tool: TheHive
+    action: create_case
+    parameters:
+      title: "PacketFence Violation - {{device_hostname}}"
+      description: |
+        Security violation detected by PacketFence:
+        - Device: {{device_hostname}} ({{device_mac}})
+        - User: {{username}}
+        - Violation Type: {{violation_type}}
+        - Location: {{device_location}}
+        - Previous Violations: {{violation_count}}
+      severity: 2
+      tags:
+        - packetfence
+        - "{{violation_type}}"
+        - nac
+        - security_violation
+      tlp: amber
+      tasks:
+        - "Verify Violation"
+        - "Check Device Compliance"
+        - "Review Security Scan"
+        - "Validate User"
+        - "Document Resolution"
+
+  # Notifications
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-alerts"
+      message: |
+        🔔 PacketFence Alert: Security Violation
+        Device: {{device_hostname}} ({{device_mac}})
+        User: {{username}}
+        Violation: {{violation_type}}
+        Status: Device quarantined
+        
+        Device Info:
+        - Category: {{device_category}}
+        - Location: {{device_location}}
+        - Previous Violations: {{violation_count}}
+        
+        Compliance Status:
+        {{compliance_summary}}
+        
+        Case: {{thehive_case_url}}
+      mentions: "@noc-team"
+
+recovery:
+  - name: compliance_verification
+    tool: PacketFence
+    action: verify_compliance
+    parameters:
+      mac_address: "{{device_mac}}"
+      required_status:
+        - antivirus: running
+        - firewall: enabled
+        - patches: current
+
+  - name: restore_access
+    tool: PacketFence
+    action: reenable_device
+    parameters:
+      mac_address: "{{device_mac}}"
+      require_registration: true
+      force_scan: true
+
+metrics:
+  - name: violation_frequency
+    description: Frequency of violations per device
+    calculation: "violations / time_period"
+    threshold: 3
+
+  - name: remediation_time
+    description: Time to resolve violation
+    calculation: "resolution_time - detection_time"
+    threshold: 7200  # seconds
+
+reporting:
+  - destination: Splunk
+    index: security_events
+    sourcetype: packetfence_violation
+
+  - destination: TheHive
+    case_tasks:
+      - task: Violation Details
+        status: Completed
+        description: |
+          PacketFence Violation Details:
+          - Type: {{violation_type}}
+          - Device Info: {{device_info}}
+          - Compliance Status: {{compliance_status}}
+          - Resolution: {{resolution_details}}

@@ -1,0 +1,81 @@
+name: Honeypot Access Response
+description: Response to unauthorized access to honeypot services
+version: 1.0
+severity: High
+
+triggers:
+  - type: HoneyPy
+    alert: service_access
+    services:
+      - ftp
+      - smb
+      - rdp
+  - type: Wazuh
+    rule_id: 87880
+    level: 10
+
+variables:
+  block_duration: 4h
+  evidence_retention: 7d
+
+actions:
+  # Initial Response
+  - name: log_access
+    tool: HoneyPy
+    action: capture_session
+    parameters:
+      session_id: "{{session_id}}"
+      service: "{{service_name}}"
+      capture_traffic: true
+
+  # Network Response
+  - name: block_source
+    tool: NVIS
+    action: block_ip
+    parameters:
+      ip: "{{source_ip}}"
+      duration: "{{block_duration}}"
+      reason: "Honeypot Access"
+
+  # Create Incident
+  - name: create_case
+    tool: TheHive
+    action: create_alert
+    parameters:
+      title: "Honeypot Access - {{service_name}}"
+      description: |
+        Unauthorized access to honeypot service:
+        Service: {{service_name}}
+        Source IP: {{source_ip}}
+        Access Time: {{access_time}}
+        Actions: {{attempted_actions}}
+      severity: 2
+      tags:
+        - honeypot
+        - "{{service_name}}"
+      tlp: amber
+
+  # Team Notification
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-alerts"
+      message: |
+        🚨 Honeypot Access Alert
+        Service: {{service_name}}
+        Source: {{source_ip}}
+        Time: {{access_time}}
+        Status: Blocked and under investigation
+        Case: {{case_url}}
+
+metrics:
+  - name: response_time
+    threshold: 300
+  - name: block_effectiveness
+    threshold: 0.95
+
+reporting:
+  - tool: Splunk
+    index: security_events
+    sourcetype: honeypot_access

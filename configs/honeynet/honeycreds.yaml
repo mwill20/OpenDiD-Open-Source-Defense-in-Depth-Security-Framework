@@ -1,0 +1,40 @@
+credentials:
+  # Admin Credentials
+  - type: domain_admin
+    username: "admin.backup"
+    password: "Spring2025!"
+    description: "Backup Domain Admin Account"
+    
+  # Service Account
+  - type: service_account
+    username: "svc_backup"
+    password: "BackupSvc2025!"
+    description: "Backup Service Account"
+    
+  # Database Access
+  - type: database
+    username: "db_readonly"
+    password: "DbRead2025!"
+    description: "Database Read Account"
+
+monitoring:
+  log_file: "/var/log/honeycreds/access.log"
+  alert_threshold: 1
+  wazuh_integration:
+    enabled: true
+    log_format: "json"
+    alert_level: 12
+
+triggers:
+  - event: credential_use
+    actions:
+      - log_event
+      - alert_team
+      - create_case
+      
+  - event: multiple_attempts
+    threshold: 3
+    timeframe: 300
+    actions:
+      - block_source
+      - increase_alert_level

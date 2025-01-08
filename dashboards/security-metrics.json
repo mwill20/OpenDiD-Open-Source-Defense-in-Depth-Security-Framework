@@ -1,0 +1,115 @@
+{
+  "title": "Security Operations Dashboard",
+  "version": "1.0",
+  "refresh": "1m",
+  "panels": [
+    {
+      "title": "Threat Detection Metrics",
+      "type": "stat",
+      "datasource": "Splunk",
+      "targets": [
+        {
+          "name": "MTTD",
+          "query": "index=security_metrics sourcetype=detection_time | stats avg(detection_time) as mttd",
+          "format": "time_series"
+        },
+        {
+          "name": "MTTR",
+          "query": "index=security_metrics sourcetype=response_time | stats avg(response_time) as mttr",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "title": "EDR Health Status",
+      "type": "gauge",
+      "datasource": "BitDefender",
+      "targets": [
+        {
+          "name": "Agent Health",
+          "query": "source=bitdefender sourcetype=agent_health | stats count by status",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "title": "Zero Trust Compliance",
+      "type": "graph",
+      "datasource": "NVIS",
+      "targets": [
+        {
+          "name": "Device Trust Score",
+          "query": "source=nvis sourcetype=trust_score | timechart avg(score) by device_type",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "title": "Critical Alerts Timeline",
+      "type": "timeline",
+      "datasource": "Wazuh",
+      "targets": [
+        {
+          "name": "Level 15 Alerts",
+          "query": "sourcetype=wazuh level=15 | timechart count",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "title": "Security Posture",
+      "type": "heatmap",
+      "datasource": "Splunk",
+      "targets": [
+        {
+          "name": "Risk Score",
+          "query": "index=security_metrics sourcetype=risk_score | stats avg(score) by category, severity",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "title": "Incident Response KPIs",
+      "type": "table",
+      "datasource": "TheHive",
+      "targets": [
+        {
+          "name": "Response Metrics",
+          "query": "source=thehive sourcetype=cases | stats avg(response_time) as MTTR, count as Total by severity",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "Timerange",
+        "type": "interval",
+        "options": [
+          "1h",
+          "6h",
+          "12h",
+          "24h",
+          "7d",
+          "30d"
+        ]
+      },
+      {
+        "name": "Severity",
+        "type": "custom",
+        "options": [
+          "Critical",
+          "High",
+          "Medium",
+          "Low"
+        ]
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "5m"
+}

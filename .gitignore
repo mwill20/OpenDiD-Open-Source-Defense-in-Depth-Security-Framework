@@ -1,45 +1,72 @@
-# Environment variables and secrets
+# Environment Variables
 .env
-*.key
-*.pem
-*.crt
-
-# Configuration files with sensitive data
-configs/**/credentials.yml
-configs/**/secrets.yml
+.env.*
+!.env.template
 
 # Logs
 logs/
 *.log
+/var/log/
 
-# Runtime data
-data/
-*.db
-*.sqlite
+# Certificates and Keys
+*.pem
+*.key
+*.crt
+*.csr
+*.srl
 
-# IDE specific files
+# Configuration with Secrets
+config/**/secrets/
+**/credentials.yaml
+**/private.key
+
+# Dependencies
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+node_modules/
+vendor/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS generated files
+# Operating System
 .DS_Store
-.DS_Store?
+Thumbs.db
+ehthumbs.db
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
 
-# Docker volumes
-volumes/
-
-# Dependencies
-node_modules/
-vendor/
-
-# Build output
+# Build
 dist/
 build/
 target/
+*.egg-info/
+
+# Temporary Files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Database
+*.sqlite3
+*.db
+*.sqlite
+
+# Custom
+local_settings.py
+custom_configs/
+volumes/

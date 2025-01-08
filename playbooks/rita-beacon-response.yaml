@@ -1,0 +1,210 @@
+name: RITA C2 Beacon Detection Response
+description: Response to potential Command & Control beaconing activity
+version: 1.0
+author: Security Team
+severity: High
+
+triggers:
+  - type: RITA
+    alert: beacon_detection
+    score: ">0.7"
+  - type: Wazuh
+    rule_id: 87840
+    level: 12
+
+variables:
+  beacon_threshold: 0.8
+  connection_threshold: 20
+  data_exfil_threshold: 1000000  # bytes
+
+conditions:
+  - check: beacon_score
+    criteria:
+      - score: ">= {{beacon_threshold}}"
+      - connections: ">= {{connection_threshold}}"
+      
+  - check: destination_reputation
+    criteria:
+      - type: "ip_reputation"
+        sources: ["AlienVault", "VirusTotal"]
+      - type: "domain_reputation"
+        sources: ["Cisco Talos", "IBM X-Force"]
+
+actions:
+  # Initial Analysis
+  - name: enrich_ioc
+    tool: RITA
+    action: analyze_connection
+    parameters:
+      analysis_types:
+        - long_connections
+        - data_transfer
+        - dns_pattern
+        - connection_timing
+      store_results: true
+
+  # Network Response
+  - name: block_traffic
+    tool: NVIS
+    action: block_connection
+    parameters:
+      direction: bidirectional
+      duration: 4h
+      source: "{{source_ip}}"
+      destination: "{{destination_ip}}"
+      ports: "{{detected_ports}}"
+
+  - name: isolate_endpoint
+    tool: PacketFence
+    action: quarantine_device
+    parameters:
+      mac_address: "{{source_mac}}"
+      reason: "C2 Beacon Detection"
+      isolation_vlan: 1200
+      duration: indefinite
+
+  # Endpoint Investigation
+  - name: endpoint_analysis
+    tool: BitDefender
+    action: full_scan
+    parameters:
+      target: "{{source_hostname}}"
+      scan_type: "rootkit,memory,processes"
+      priority: high
+
+  - name: process_analysis
+    tool: Action1
+    action: collect_processes
+    parameters:
+      target: "{{source_hostname}}"
+      include_children: true
+      include_modules: true
+      memory_dump: true
+
+  # Evidence Collection
+  - name: packet_capture
+    tool: RITA
+    action: start_capture
+    parameters:
+      interface: "{{affected_interface}}"
+      filter: "host {{destination_ip}}"
+      duration: 1h
+      output: "/evidence/{{incident_id}}/pcap/"
+
+  - name: collect_logs
+    tool: Wazuh
+    action: collect_evidence
+    parameters:
+      agent_id: "{{source_agent_id}}"
+      log_types:
+        - security
+        - system
+        - powershell
+        - network
+      timeframe:
+        start: "{{detection_time-3600}}"
+        end: "{{detection_time+300}}"
+
+  # Incident Management
+  - name: create_incident
+    tool: TheHive
+    action: create_case
+    parameters:
+      title: "C2 Beacon Detection - {{source_hostname}}"
+      description: |
+        RITA detected potential C2 beaconing activity:
+        - Source: {{source_ip}} ({{source_hostname}})
+        - Destination: {{destination_ip}} ({{destination_domain}})
+        - Beacon Score: {{beacon_score}}
+        - Connection Count: {{connection_count}}
+        - Average Interval: {{avg_interval}}s
+        - Data Transferred: {{data_volume}} bytes
+      severity: 3
+      tags: 
+        - rita
+        - c2
+        - beacon
+        - "{{threat_category}}"
+      tlp: amber
+      pap: amber
+      tasks:
+        - "Verify RITA Detection"
+        - "Analyze Network Traffic"
+        - "Investigate Endpoint"
+        - "Review Process Timeline"
+        - "Check for Lateral Movement"
+        - "Document Findings"
+
+  # Notifications
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-critical"
+      message: |
+        🚨 RITA Alert: C2 Beacon Detection
+        Host: {{source_hostname}} ({{source_ip}})
+        Destination: {{destination_ip}} ({{destination_domain}})
+        Beacon Score: {{beacon_score}}
+        Status: Traffic blocked, endpoint quarantined
+        
+        Initial Analysis:
+        - Connection Count: {{connection_count}}
+        - Avg Interval: {{avg_interval}}s
+        - Data Volume: {{data_volume}} bytes
+        
+        Reputation Info:
+        {{reputation_summary}}
+        
+        Case: {{thehive_case_url}}
+      mentions: "@security-oncall"
+
+metrics:
+  - name: detection_accuracy
+    description: Accuracy of beacon detection
+    calculation: "true_positive / (true_positive + false_positive)"
+    threshold: 0.8
+
+  - name: response_time
+    description: Time from detection to containment
+    calculation: "containment_time - detection_time"
+    threshold: 300  # seconds
+
+recovery:
+  - name: verify_containment
+    tool: RITA
+    action: verify_traffic
+    parameters:
+      source: "{{source_ip}}"
+      destination: "{{destination_ip}}"
+      duration: 15m
+
+  - name: restore_access
+    tool: PacketFence
+    action: restore_device
+    parameters:
+      mac_address: "{{source_mac}}"
+      require_approval: true
+      scan_required: true
+
+reporting:
+  - destination: Splunk
+    index: security_incidents
+    sourcetype: rita_c2_detection
+
+  - destination: TheHive
+    case_tasks:
+      - task: Detection Details
+        status: Completed
+        description: |
+          RITA Detection Metrics:
+          - Beacon Score: {{beacon_score}}
+          - Connection Pattern: {{connection_pattern}}
+          - Data Analysis: {{data_analysis}}
+          
+          Network Response:
+          - Traffic Blocked: {{block_status}}
+          - Quarantine Status: {{quarantine_status}}
+          
+          Initial Investigation:
+          {{investigation_summary}}

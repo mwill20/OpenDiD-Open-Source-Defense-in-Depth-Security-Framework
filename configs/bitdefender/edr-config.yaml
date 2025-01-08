@@ -1,0 +1,42 @@
+api:
+  url: ${BITDEFENDER_API_URL}
+  key: ${BITDEFENDER_API_KEY}
+  company_id: ${BITDEFENDER_COMPANY_ID}
+
+endpoint:
+  policy: High_Security
+  scan_schedule: daily
+  update_schedule: 4h
+
+integration:
+  wazuh:
+    enabled: true
+    manager: ${WAZUH_MANAGER_IP}
+    port: ${WAZUH_API_PORT}
+    alert_level: 7
+  thehive:
+    enabled: true
+    url: ${THEHIVE_URL}
+    api_key: ${THEHIVE_API_KEY}
+    case_template: endpoint-alert
+
+alerts:
+  severity_mapping:
+    low: 3
+    medium: 7
+    high: 10
+    critical: 13
+  notification:
+    slack:
+      enabled: true
+      webhook: ${SLACK_WEBHOOK_URL}
+      channel: ${SLACK_CHANNEL}
+
+logging:
+  level: info
+  format: json
+  splunk:
+    enabled: true
+    hec_token: ${SPLUNK_HEC_TOKEN}
+    index: security_events
+    source: bitdefender_edr

@@ -1,0 +1,151 @@
+{
+    "zero_trust_configuration": {
+        "authentication": {
+            "mfa_required": true,
+            "certificate_based": true,
+            "session_timeout": 3600,
+            "device_validation": {
+                "action1_verification": {
+                    "enabled": true,
+                    "api_endpoint": "https://[ACTION1-API]/device/verify",
+                    "api_key": "[ACTION1-API-KEY]",
+                    "required_status": ["compliant", "managed"]
+                },
+                "bitdefender_verification": {
+                    "enabled": true,
+                    "api_endpoint": "https://[BITDEFENDER-API]/devices",
+                    "api_key": "[BITDEFENDER-API-KEY]",
+                    "required_status": ["protected", "up-to-date"]
+                }
+            }
+        },
+        "authorization": {
+            "just_in_time": true,
+            "expire_after": "8h",
+            "require_reason": true,
+            "risk_based_access": true
+        }
+    },
+    "network_segments": {
+        "secure_production": {
+            "vlan_id": 100,
+            "subnet": "[PROD-SUBNET]",
+            "gateway": "[PROD-GATEWAY]",
+            "access_controls": {
+                "require_security_tools": true,
+                "minimum_device_score": 90,
+                "allowed_protocols": ["HTTPS", "SSH"],
+                "inbound": ["strict"],
+                "outbound": ["controlled"]
+            }
+        },
+        "standard_corporate": {
+            "vlan_id": 200,
+            "subnet": "[CORP-SUBNET]",
+            "gateway": "[CORP-GATEWAY]",
+            "access_controls": {
+                "require_security_tools": true,
+                "minimum_device_score": 80,
+                "allowed_protocols": ["HTTP", "HTTPS", "SSH"],
+                "inbound": ["controlled"],
+                "outbound": ["standard"]
+            }
+        },
+        "guest": {
+            "vlan_id": 300,
+            "subnet": "[GUEST-SUBNET]",
+            "gateway": "[GUEST-GATEWAY]",
+            "access_controls": {
+                "require_security_tools": false,
+                "allowed_protocols": ["HTTP", "HTTPS"],
+                "inbound": ["restricted"],
+                "outbound": ["internet-only"]
+            }
+        }
+    },
+    "device_scoring": {
+        "factors": {
+            "action1_compliance": {
+                "weight": 30,
+                "checks": [
+                    "patch_status",
+                    "required_software",
+                    "security_baselines"
+                ]
+            },
+            "bitdefender_status": {
+                "weight": 30,
+                "checks": [
+                    "protection_status",
+                    "threat_status",
+                    "update_status"
+                ]
+            },
+            "behavior_score": {
+                "weight": 20,
+                "checks": [
+                    "authentication_history",
+                    "access_patterns",
+                    "security_incidents"
+                ]
+            },
+            "device_health": {
+                "weight": 20,
+                "checks": [
+                    "system_health",
+                    "encryption_status",
+                    "firmware_status"
+                ]
+            }
+        },
+        "minimum_scores": {
+            "secure_production": 90,
+            "standard_corporate": 80,
+            "guest": 0
+        }
+    },
+    "monitoring": {
+        "wazuh_integration": {
+            "enabled": true,
+            "log_path": "/var/log/nvis/events.log",
+            "events": [
+                "access_requests",
+                "policy_violations",
+                "security_scores",
+                "authentication_events"
+            ]
+        }
+    },
+    "compliance": {
+        "device_requirements": {
+            "action1_mrr": {
+                "required": true,
+                "minimum_version": "2.0",
+                "compliance_status": "compliant"
+            },
+            "bitdefender_edr": {
+                "required": true,
+                "minimum_version": "7.0",
+                "protection_status": "active"
+            }
+        },
+        "access_policies": {
+            "new_devices": {
+                "initial_segment": "guest",
+                "promotion_requirements": {
+                    "action1_verified": true,
+                    "bitdefender_active": true,
+                    "compliance_score": 80
+                }
+            },
+            "existing_devices": {
+                "reevaluation_period": "1h",
+                "grace_period": "24h",
+                "compliance_actions": {
+                    "warning_threshold": 85,
+                    "quarantine_threshold": 70
+                }
+            }
+        }
+    }
+}

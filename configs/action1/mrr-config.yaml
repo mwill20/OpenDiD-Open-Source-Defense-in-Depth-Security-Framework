@@ -1,0 +1,146 @@
+# Action1 MRR Configuration - Primary Endpoint Management Solution
+
+api_configuration:
+  base_url: "https://[ACTION1-CLOUD-URL]"
+  api_key: "[YOUR-ACTION1-API-KEY]"
+  organization_id: "[YOUR-ORG-ID]"
+
+# Pre-deployment Configuration for New Employees
+onboarding:
+  automated_deployment: true
+  prerequisites:
+    minimum_os_version: "Windows 10 20H2"
+    required_updates:
+      - "Latest Security Updates"
+      - "Latest Service Pack"
+    required_software:
+      - name: "BitDefender EDR"
+        version: "latest"
+        mandatory: true
+      - name: "NVIS Client"
+        version: "latest"
+        mandatory: true
+  compliance_checks:
+    - disk_encryption_enabled
+    - firewall_enabled
+    - antivirus_enabled
+    - password_policy_compliant
+
+endpoint_management:
+  deployment:
+    auto_deployment: true
+    deployment_groups:
+      - name: "New-Employees"
+        policy: "onboarding-policy"
+      - name: "Standard-Users"
+        policy: "standard-policy"
+      - name: "Privileged-Users"
+        policy: "privileged-policy"
+  
+  policies:
+    onboarding-policy:
+      validity_period: "24h"
+      patch_management:
+        enabled: true
+        force_updates: true
+        categories:
+          - security
+          - critical
+          - system
+        auto_approve: true
+      software_deployment:
+        bitdefender:
+          package: "BitDefender EDR"
+          version: "latest"
+          mandatory: true
+        nvis:
+          package: "NVIS Client"
+          version: "latest"
+          mandatory: true
+      compliance:
+        block_access_until_compliant: true
+        requirements:
+          - windows_updates_current
+          - security_tools_installed
+          - security_baselines_met
+    
+    standard-policy:
+      patch_management:
+        enabled: true
+        schedule: "0 0 * * 3"  # Weekly on Wednesday
+        categories:
+          - security
+          - critical
+        auto_approve: false
+      software_inventory:
+        enabled: true
+        scan_interval: 24  # hours
+      security_checks:
+        frequency: "4h"
+        verify:
+          - bitdefender_running
+          - nvis_connected
+          - system_compliance
+    
+    privileged-policy:
+      patch_management:
+        enabled: true
+        schedule: "0 0 * * 0"  # Weekly on Sunday
+        categories:
+          - security
+          - critical
+        auto_approve: false
+        notification:
+          email: "[ADMIN-EMAIL]"
+      software_inventory:
+        enabled: true
+        scan_interval: 12  # hours
+      security_checks:
+        frequency: "2h"
+        verify:
+          - bitdefender_running
+          - nvis_connected
+          - system_compliance
+          - privileged_access_valid
+
+integration:
+  wazuh_integration:
+    enabled: true
+    log_path: "/var/log/action1/events.log"
+    events:
+      - "deployment_status"
+      - "compliance_status"
+      - "security_tool_status"
+    
+  nvis_integration:
+    enabled: true
+    api_endpoint: "https://[NVIS-API]"
+    api_key: "[NVIS-API-KEY]"
+    actions:
+      - "verify_device_compliance"
+      - "enforce_access_policy"
+  
+  bitdefender_verification:
+    enabled: true
+    check_interval: "1h"
+    actions:
+      - "verify_installation"
+      - "check_status"
+      - "enforce_policy"
+
+reporting:
+  onboarding_status:
+    report_name: "New Device Compliance"
+    schedule: "0 */4 * * *"  # Every 4 hours
+    recipients: 
+      - "[SECURITY-TEAM-EMAIL]"
+      - "[IT-TEAM-EMAIL]"
+    include:
+      - deployment_status
+      - compliance_status
+      - security_tools_status
+  
+  compliance_reports:
+    report_name: "Security Compliance Status"
+    schedule: "0 8 * * 1-5"  # Weekdays 8 AM
+    recipients: ["[SECURITY-TEAM-EMAIL]"]

@@ -1,0 +1,39 @@
+{
+    "services": {
+        "ftp": {
+            "enabled": true,
+            "port": 21,
+            "protocol": "tcp",
+            "plugin": "FTPPlugin",
+            "low_interaction": true,
+            "banner": "220 FTP Server Ready"
+        },
+        "smb": {
+            "enabled": true,
+            "port": 445,
+            "protocol": "tcp",
+            "plugin": "SMBPlugin",
+            "shares": [
+                "public",
+                "internal"
+            ]
+        },
+        "rdp": {
+            "enabled": true,
+            "port": 3389,
+            "protocol": "tcp",
+            "plugin": "RDPPlugin",
+            "banner": "Windows Server 2019"
+        }
+    },
+    "logging": {
+        "enabled": true,
+        "filepath": "/var/log/honeypy/honeypy.log",
+        "format": "json"
+    },
+    "wazuh_integration": {
+        "enabled": true,
+        "agent_id": "honeypy-001",
+        "alert_level": 10
+    }
+}

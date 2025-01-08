@@ -1,0 +1,102 @@
+---
+# RITA (Real Intelligence Threat Analytics) Configuration
+
+LogPath: "/var/log/rita"
+LogLevel: "INFO"
+
+# Database Configuration
+MongoDB:
+  ConnectionString: "mongodb://localhost:27017"
+  DatabaseName: "rita"
+  UserName: "[RITA-DB-USER]"
+  Password: "[RITA-DB-PASSWORD]"
+
+# Zeek Integration
+Zeek:
+  LogPath: "/opt/zeek/logs"
+  ImportBuffer: 100000
+
+# Analysis Configuration
+Beacons:
+  DefaultConnectionThreshold: 20
+  Score:
+    ConnectionCount: 0.3
+    TemporalConsistency: 0.4
+    DistributionScore: 0.3
+  
+DNS:
+  Enabled: true
+  UniqueDNSLimit: 1000
+  SubdomainDetection: true
+  DomainEntropy: true
+
+Blacklisted:
+  CustomIPBlacklist: "/etc/rita/custom-blacklist.txt"
+  CustomHostnameBlacklist: "/etc/rita/custom-hostname-blacklist.txt"
+  UseFeodo: true
+  UseTor: true
+
+# Wazuh Integration
+Wazuh:
+  Enabled: true
+  Manager: "[WAZUH-MANAGER-IP]"
+  Port: 1514
+  AlertLevel: 10
+  CustomLocation: "/var/ossec/logs/rita/"
+
+# Threat Intelligence
+ThreatIntel:
+  Sources:
+    - name: "AlienVault OTX"
+      enabled: true
+      api_key: "[OTX-API-KEY]"
+    - name: "VirusTotal"
+      enabled: true
+      api_key: "[VT-API-KEY]"
+
+# Beacon Analysis
+BeaconAnalysis:
+  MinimumScore: 0.7
+  MinimumPairs: 10
+  ConnectionLimitPercent: 0.1
+  TimestampVariance: 30
+  TimestampVariancePercent: 0.1
+
+# Long Connections
+LongConnections:
+  MinimumDuration: 3600
+  MaximumDuration: 86400
+
+# Scanning
+Scanning:
+  ScanThreshold: 50
+  PortCountThreshold: 1000
+  TimestampScanThreshold: 100
+
+# Data Exfiltration
+DataExfil:
+  RatioThreshold: 3.0
+  TransferThreshold: 1000000
+  UniqueConnectionThreshold: 20
+
+# Reporting
+Reporting:
+  OutputFormat: "json"
+  EnableHTML: true
+  EnableCSV: true
+  ReportPath: "/var/log/rita/reports"
+
+# Logging Configuration
+Logging:
+  LogToFile: true
+  LogToSyslog: true
+  SyslogFacility: "LOCAL0"
+  MaxSize: 100
+  MaxBackups: 3
+  MaxAge: 28
+
+# Performance
+Performance:
+  ThreadCount: 8
+  BatchSize: 1000
+  CacheSize: 1024

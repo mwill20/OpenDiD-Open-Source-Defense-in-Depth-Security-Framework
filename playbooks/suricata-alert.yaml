@@ -1,0 +1,82 @@
+name: Suricata Honeypot Alert Response
+description: Response to Suricata IDS alerts from honeypot network
+version: 1.0
+severity: High
+
+triggers:
+  - type: Suricata
+    alert: honeypot_alert
+    categories:
+      - attempted-recon
+      - suspicious-login
+      - attempted-admin
+      - data-theft
+  - type: Wazuh
+    rule_id: 87900
+    level: 10
+
+variables:
+  block_duration: 4h
+  scan_timeout: 300
+
+actions:
+  # Initial Analysis
+  - name: analyze_traffic
+    tool: Suricata
+    action: packet_capture
+    parameters:
+      source_ip: "{{alert.source_ip}}"
+      dest_ip: "{{alert.dest_ip}}"
+      duration: 300
+      
+  # Network Response
+  - name: block_traffic
+    tool: NVIS
+    action: block_source
+    parameters:
+      ip: "{{alert.source_ip}}"
+      duration: "{{block_duration}}"
+      reason: "Suricata Honeypot Alert"
+
+  # Incident Creation
+  - name: create_case
+    tool: TheHive
+    action: create_alert
+    parameters:
+      title: "Suricata Alert - {{alert.signature}}"
+      description: |
+        Suricata detected suspicious activity:
+        Rule: {{alert.signature}}
+        Source IP: {{alert.source_ip}}
+        Destination: {{alert.dest_ip}}
+        Classification: {{alert.classification}}
+      severity: 2
+      tags:
+        - suricata
+        - honeypot
+        - "{{alert.category}}"
+      tlp: amber
+
+  # Team Notification
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-alerts"
+      message: |
+        🔍 Suricata Alert: {{alert.signature}}
+        Source: {{alert.source_ip}}
+        Target: {{alert.dest_ip}}
+        Status: Traffic blocked
+        Case: {{case_url}}
+
+metrics:
+  - name: alert_response_time
+    threshold: 60
+  - name: false_positive_rate
+    threshold: 0.1
+
+reporting:
+  - tool: Splunk
+    index: security_events
+    sourcetype: suricata_alert

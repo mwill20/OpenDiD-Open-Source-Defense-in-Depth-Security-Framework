@@ -1,0 +1,94 @@
+{
+    "name": "Security Incident Response",
+    "description": "Automated response to security incidents",
+    "triggers": [
+        {
+            "type": "Alert",
+            "conditions": {
+                "severity": ["high", "critical"],
+                "source": ["Wazuh", "Bitdefender", "Action1"]
+            }
+        }
+    ],
+    "tasks": [
+        {
+            "name": "Initial Triage",
+            "type": "automated",
+            "actions": [
+                {
+                    "type": "TheHiveAnalyzer",
+                    "command": "get_similar_cases"
+                },
+                {
+                    "type": "Cortex",
+                    "analyzer": "VirusTotal_GetReport"
+                }
+            ]
+        },
+        {
+            "name": "Containment",
+            "type": "automated",
+            "conditions": {
+                "severity": "critical"
+            },
+            "actions": [
+                {
+                    "type": "BitdefenderEDR",
+                    "command": "isolate_endpoint",
+                    "parameters": {
+                        "api_key": "[BITDEFENDER-API-KEY]"
+                    }
+                },
+                {
+                    "type": "NVIS",
+                    "command": "block_traffic",
+                    "parameters": {
+                        "direction": "both",
+                        "api_key": "[NVIS-API-KEY]"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Evidence Collection",
+            "type": "automated",
+            "actions": [
+                {
+                    "type": "Splunk",
+                    "command": "collect_logs",
+                    "parameters": {
+                        "timerange": "-24h",
+                        "token": "[SPLUNK-TOKEN]"
+                    }
+                },
+                {
+                    "type": "Action1",
+                    "command": "collect_artifacts",
+                    "parameters": {
+                        "api_key": "[ACTION1-API-KEY]"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Notification",
+            "type": "automated",
+            "actions": [
+                {
+                    "type": "Email",
+                    "parameters": {
+                        "to": "[SECURITY-TEAM-EMAIL]",
+                        "template": "incident_notification"
+                    }
+                },
+                {
+                    "type": "Slack",
+                    "parameters": {
+                        "channel": "#security-incidents",
+                        "webhook": "[SLACK-WEBHOOK-URL]"
+                    }
+                }
+            ]
+        }
+    ]
+}

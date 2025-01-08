@@ -1,0 +1,111 @@
+name: HoneyCred Abuse Response
+description: Response to unauthorized use of honey credentials
+version: 1.0
+severity: Critical
+
+triggers:
+  - type: HoneyCreds
+    alert: credential_use
+    credential_types:
+      - domain_admin
+      - service_account
+      - database
+  - type: Wazuh
+    rule_id: 87890
+    level: 13
+
+variables:
+  quarantine_duration: 24h
+  alert_threshold: 1
+
+actions:
+  # Immediate Response
+  - name: capture_details
+    tool: HoneyCreds
+    action: log_access
+    parameters:
+      credential_id: "{{cred_id}}"
+      access_type: "{{access_type}}"
+      source_details: "{{source_details}}"
+
+  # Network Containment
+  - name: isolate_source
+    tool: PacketFence
+    action: quarantine
+    parameters:
+      mac_address: "{{source_mac}}"
+      ip_address: "{{source_ip}}"
+      duration: "{{quarantine_duration}}"
+      reason: "Honey Credential Use"
+
+  # Security Scan
+  - name: scan_source
+    tool: OpenVAS
+    action: targeted_scan
+    parameters:
+      target: "{{source_ip}}"
+      scan_config: "Full and Fast"
+      priority: high
+
+  # Incident Creation
+  - name: create_incident
+    tool: TheHive
+    action: create_alert
+    parameters:
+      title: "HoneyCred Alert - {{cred_type}}"
+      description: |
+        Honey credential access detected:
+        Credential: {{cred_username}} ({{cred_type}})
+        Source: {{source_ip}}
+        Location: {{access_location}}
+        Time: {{access_time}}
+      severity: 3
+      tags:
+        - honeycred
+        - "{{cred_type}}"
+      tlp: amber
+      tasks:
+        - "Verify Access"
+        - "Check for Additional Compromise"
+        - "Document Findings"
+
+  # Alert Team
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-critical"
+      message: |
+        ⚠️ HoneyCred Alert
+        Type: {{cred_type}}
+        Source: {{source_ip}}
+        Time: {{access_time}}
+        Status: Source quarantined
+        Case: {{case_url}}
+      mentions: "@security-team"
+
+recovery:
+  - name: verify_containment
+    tool: PacketFence
+    action: verify_quarantine
+    parameters:
+      mac_address: "{{source_mac}}"
+      duration: 15m
+
+  - name: restore_access
+    tool: PacketFence
+    action: unquarantine
+    parameters:
+      mac_address: "{{source_mac}}"
+      require_approval: true
+
+metrics:
+  - name: detection_time
+    threshold: 60
+  - name: containment_time
+    threshold: 300
+
+reporting:
+  - tool: Splunk
+    index: security_events
+    sourcetype: honeycred_alert

@@ -1,0 +1,71 @@
+# Honeypot Detection Rules
+
+# FTP Honeypot Access
+alert tcp any any -> $HONEYPOT_NET 21 (
+    msg:"HONEYPOT FTP Access Attempt";
+    flow:established,to_server;
+    classtype:attempted-recon;
+    sid:1000001; rev:1;
+)
+
+# SMB Honeypot Access
+alert tcp any any -> $HONEYPOT_NET 445 (
+    msg:"HONEYPOT SMB Access Attempt";
+    flow:established,to_server;
+    classtype:attempted-recon;
+    sid:1000002; rev:1;
+)
+
+# RDP Honeypot Access
+alert tcp any any -> $HONEYPOT_NET 3389 (
+    msg:"HONEYPOT RDP Access Attempt";
+    flow:established,to_server;
+    classtype:attempted-recon;
+    sid:1000003; rev:1;
+)
+
+# Multiple Service Scan Detection
+alert tcp any any -> $HONEYPOT_NET any (
+    msg:"HONEYPOT Multiple Service Scan";
+    flow:to_server;
+    threshold: type threshold, track by_src, count 5, seconds 60;
+    classtype:attempted-recon;
+    sid:1000004; rev:1;
+)
+
+# Honey Credential Use Detection
+alert tcp any any -> $HOME_NET any (
+    msg:"HONEYPOT Credential Use Detected";
+    content:"admin.backup"; nocase;
+    content:"svc_backup"; nocase;
+    content:"db_readonly"; nocase;
+    classtype:suspicious-login;
+    sid:1000005; rev:1;
+)
+
+# Brute Force Attack Detection
+alert tcp any any -> $HONEYPOT_NET any (
+    msg:"HONEYPOT Brute Force Attack";
+    flow:established,to_server;
+    threshold: type threshold, track by_src, count 20, seconds 60;
+    classtype:attempted-admin;
+    sid:1000006; rev:1;
+)
+
+# Data Exfiltration Detection
+alert tcp any any -> $EXTERNAL_NET any (
+    msg:"HONEYPOT Data Exfiltration";
+    flow:established,to_server;
+    threshold: type threshold, track by_src, bytes 1000000, seconds 300;
+    classtype:data-theft;
+    sid:1000007; rev:1;
+)
+
+# Command Injection Attempt
+alert tcp any any -> $HONEYPOT_NET any (
+    msg:"HONEYPOT Command Injection Attempt";
+    content:"|3b|"; content:"|7c|";  # ; and |
+    content:"|26|"; content:"|60|";  # & and `
+    classtype:attempted-admin;
+    sid:1000008; rev:1;
+)

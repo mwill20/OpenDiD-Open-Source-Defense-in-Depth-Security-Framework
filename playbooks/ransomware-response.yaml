@@ -1,0 +1,132 @@
+name: Ransomware Incident Response
+description: Automated response to ransomware detection
+version: 1.0
+author: Security Team
+severity: Critical
+
+triggers:
+  - type: BitDefender
+    alert: ransomware_detection
+  - type: Wazuh
+    rule_id: 87832
+    level: 15
+
+conditions:
+  - check: process_matching
+    criteria:
+      - process_name: "*encrypt*"
+      - file_operations: "mass_write"
+      - network_connections: "suspicious_c2"
+
+actions:
+  # Immediate Containment
+  - name: isolate_endpoint
+    tool: BitDefender
+    action: network_isolation
+    parameters:
+      isolation_type: full
+      duration: indefinite
+
+  - name: block_user
+    tool: Action1
+    action: disable_user
+    parameters:
+      scope: domain_wide
+      notification: true
+
+  # Evidence Collection
+  - name: capture_memory
+    tool: BitDefender
+    action: memory_dump
+    parameters:
+      format: raw
+      destination: incident_storage
+
+  - name: collect_artifacts
+    tool: Wazuh
+    action: collect_evidence
+    parameters:
+      types: 
+        - process_list
+        - network_connections
+        - file_changes
+        - registry_changes
+
+  # Network Response
+  - name: block_iocs
+    tool: NVIS
+    action: block_traffic
+    parameters:
+      direction: both
+      scope: enterprise
+      duration: 24h
+
+  # Incident Management
+  - name: create_incident
+    tool: TheHive
+    action: create_case
+    parameters:
+      title: "Ransomware Detection - {{hostname}}"
+      severity: 3
+      tags: 
+        - ransomware
+        - active_threat
+      tlp: amber
+      tasks:
+        - "Isolate Affected Systems"
+        - "Collect Evidence"
+        - "Identify Patient Zero"
+        - "Determine Scope"
+        - "Initiate Recovery"
+
+  # Notifications
+  - name: notify_team
+    tool: Slack
+    action: send_alert
+    parameters:
+      channel: "#security-emergency"
+      message: |
+        🚨 CRITICAL: Ransomware Detected
+        Host: {{hostname}}
+        User: {{username}}
+        Process: {{process_name}}
+        SHA256: {{file_hash}}
+        Action: System isolated, evidence collection in progress
+      mentions: "@security-oncall"
+
+recovery:
+  - name: verify_containment
+    tool: BitDefender
+    action: scan_network
+    parameters:
+      scan_type: full
+      priority: high
+
+  - name: restore_access
+    tool: Action1
+    action: enable_user
+    parameters:
+      require_approval: true
+      mfa_required: true
+
+metrics:
+  - name: time_to_containment
+    description: Time from detection to isolation
+    unit: seconds
+    threshold: 300
+
+  - name: affected_systems
+    description: Number of systems impacted
+    unit: count
+    threshold: 1
+
+reporting:
+  - destination: Splunk
+    index: security_incidents
+    sourcetype: ransomware_response
+
+  - destination: TheHive
+    case_tasks:
+      - task: Incident Timeline
+        status: InProgress
+        description: Automated response executed
